@@ -1,0 +1,24 @@
+convert a.tif LUT-red.tiff -clut -set colorspace RGB  b.tif
+convert a.tif -background black -channel green -combine -colorspace RBG b.tif
+
+convert -size 100x100 gradient:black-green g.tiff
+convert -size 460x1 gradient:black-lime -sigmoidal-contrast 6,50% g.tiff
+convert -size 100x100 gradient:black-green -evaluate cos 0.5 -negate g.tiff
+
+http://www.imagemagick.org/Usage/color_basics/#channels
+http://www.imagemagick.org/Usage/color_mods/#color_lut
+http://www.imagemagick.org/Usage/color_mods/#sigmoidal
+http://www.imagemagick.org/script/color.php
+
+http://fiji.sc/Headless
+
+
+happy with
+
+LUT
+convert -size 460x1 gradient:black-lime -sigmoidal-contrast 10,50% g.tiff
+
+convert a.tif g.tiff -clut -gamma .05 b.tif
+
+
+convert a.tif -size 460x1 gradient:black-lime -sigmoidal-contrast 10,50% -clut -gamma .05 b.tif

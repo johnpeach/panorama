@@ -1,0 +1,58 @@
+#!/bin/bash 
+# Not sure what the following line does any more does any more
+# PTBatcherGUI --batch --shutdown --verbose --overwrite green.pto
+
+if [ -z "$1" ]; then
+    NAME='stitched';
+else
+    NAME="$1";
+fi
+
+#http://wiki.panotools.org/Panorama_scripting_in_a_nutshell
+
+# Generate the basic pto file.  A series of steps will be run
+# to modify the file
+
+## TODO: parameterize the fov, and input file names
+pto_gen --output project.pto --projection 0 --fov 10 *.png
+
+# Find the control points
+cpfind --multirow -o project.pto project.pto
+
+# Clean up the control points. Basically, remove ones that are far away
+cpclean -o project.pto project.pto
+
+# Find vertical lines and align the image.  Normally, this does nothing.
+linefind --output project.pto project.pto
+
+# optiize the image positions
+#autooptimiser -a -m -s -o project.pto project.pto
+
+# Or we could run the optimizer
+ pto_var --opt y,p,r -o project.pto project.pto
+ autooptimiser -n -o project.pto project.pto
+
+# crop the image
+# TODO: make this a commandline option
+pano_modify --canvas=AUTO --crop=AUTO --output project_crop.pto project.pto
+pano_modify --canvas=AUTO --output project_nocrop.pto project.pto
+
+# Prepare the slices
+nona -o tmp_ project_crop.pto
+
+# Merge images together
+# TODO: parameterise the output filename
+enblend --verbose --output $NAME_crop.tif tmp_????.tif
+
+# clean up images
+rm tmp_????.tif
+
+# Prepare the slices
+nona -o tmp_ project_nocrop.pto
+
+# Merge images together
+# TODO: parameterise the output filename
+enblend --verbose --output $NAME_nocrop.tif tmp_????.tif
+
+# clean up images
+rm tmp_????.tif

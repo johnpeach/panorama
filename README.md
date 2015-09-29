@@ -1,0 +1,2 @@
+# panorama
+stitch together images

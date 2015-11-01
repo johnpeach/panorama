@@ -1,0 +1,115 @@
+#!/bin/bash
+
+# Standard library functions to be included in other bash scripts
+
+# Author: John Peach (john@jppeach.com)
+
+# ChangeLog
+# 1.0.0    Initial Release
+# 1.1.0    Added quoted_array
+# 1.2.0
+
+# Sample code to load the library
+#LIBLIST=('/usr/local/sbin/stdlib')
+#for file in "${LIBLIST[@]}" ; do
+#   [ -x "$file" ] && { source $file; }
+#done
+
+
+#####################################################################################################
+# Functions
+#####################################################################################################
+
+# join an array and echo elements seperated by $1
+# PARAMETERS:   $1      seperator
+#               $2..    unknown number of parameters
+# Examples:
+# join , a "b c" d #a,b c,d
+# join / var local tmp #var/local/tmp
+# join , "${FOO[@]}" #a,b,c
+function join { 
+   local IFS="$1" 
+   shift 
+   echo "$*" 
+}
+
+# wrap single quotes around each element in an array and echo it out onto a single
+# line.  This is useful for quoting filenames used for command line arguements
+#
+# PARAMETERS:  $1       name of array by reference
+# Example:
+# FILE_STRING=$(quoted_array FILE_LIST[@])   # note the lack of $ 
+function quoted_array {
+    local myarray=("${!1}")
+
+    for x in "${myarray[@]}"; do
+        echo -n "'$x' "
+    done
+}
+
+# Determine if a name exists and it is a function.
+# PARAMETERS:   $1       function name
+#
+# returns $ISFUNCTION_VALID if true, $ISFUNCTION_INVALID otherwise.  Check $?
+# Examples:
+# isFunction 'join'
+# if [ $? -eq $ISFUNCTION_VALID ]; then
+#   echo 'join is a fuction'
+# fi
+ISFUNCTION_VALID=1
+ISFUNCTION_INVALID=0
+function isFunction() {
+   local funname="$1" 
+
+   # make sure there is a fuction name
+   [ -z "$funname" ] && { return $ISFUNCTION_INVALID; }
+
+   # Make sure that it function
+   if [ -n "$(type -t $funname)" ] && [ "$(type -t $funname)" == "function" ]; then
+       return $ISFUNCTION_VALID
+   else
+       return $ISFUNCTION_INVALID
+   fi
+}
+
+# Assert that the first parameter is not zero length
+# if it is then print an error message in parameter $2
+# to STDERR and exit the program. If there is no second
+# parameter, call usage (if it is defined) and exit
+# PARAMETERS:   $1      Tested to see if it is zero length
+#               $2      Error message to print
+#               $3      Error code to use if the program is to exit
+function AssertNonZeroLen() {
+    local test_value="$1" 
+    local message="$2" 
+    local err_code="$3" 
+
+    if [ -z "$test_value" ] ; then
+        if [ -n "$message" ] ; then
+            ErrorMsg "$message" "$err_code"
+        else
+            # If usage is a defined function, call it.
+            isFunction 'usage'
+            local usage_exists=$?
+            [ $usage_exists -eq $ISFUNCTION_VALID ] && { usage; }
+        fi
+        [ -z "$err_code" ] && {  exit $err_code; }
+    fi
+}
+
+# Error Message
+#
+# Write an error message to STDERR.  If an error code is given then also exit with that code.
+#
+# Parameter:    $1      Error message
+#               $2      if exists, it must be an exit code (0-255).  The program will exit
+function ErrorMsg() { 
+    local message="$1" 
+    local err_code="$2" 
+
+    >&2 echo "ERROR: $message"
+    if [ -n "$err_code" ] ; then
+        # Exit code was give, exit the program
+        exit $err_code
+    fi
+}

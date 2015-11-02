@@ -3,21 +3,38 @@
 # This is a wrapper script that pulls together a number Hugin scripts
 # that will process a set of images to create stitched images.
 #
-
-
-# Not sure what this does any more
-# PTBatcherGUI --batch --shutdown --verbose --overwrite green.pto
+# (c) Copyright 2015 John Peach
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Maintainer john@jppeach.com <John Peach> 
+#
 
 VER='1.1.0'
 # CHANGELOG
 # 1.0.0 Initial release
+# 1.1.0 Added options h,v,o,O,c,C,d,l,L,r,f,V,p,R
+
+# Bugs
+# Error messages sent to ErrorMsg and AssertNonZeroLen are not logged
 
 # Defaults
-CROP_FILE_DEFAULT='stitched_crop'        # name of the cropped file
-CROP_FILE_EXT='.tif'                     # file extension added by Hugin
-OUTPUT_FILE_DEFAULT='stitched'           # name of the stitched file
 OUTPUT_FILE_EXT='.tif'                   # file extension added by Hugin
+CROP_FILE_EXT="$OUTPUT_FILE_EXT"         # file extension added by Hugin
+OUTPUT_FILE_DEFAULT='stitched'           # name of the stitched file
 CROP_PROJECT_SUFFIX='_crop'              # suffix to add to PROJECT_FILE to create CROP_PROJECT_FILE
+CROP_FILE_DEFAULT="$OUTPUT_FILE_DEFAULT$CROP_PROJECT_SUFFIX" # name of the cropped file
 OUTPUT='DEFAULT'                         # SUPPRESS | PROCESS | DEFAULT what to do with the stitched file
 CROP='DEFAULT'                           # SUPPRESS | PROCESS | DEFAULT what to do with the cropped file
 PROJECT='DEFAULT'                        # CREATE  | PTOGIVEN | DEFAULT what project file to use
@@ -26,19 +43,8 @@ CLOBBER=0                                # Clobber the Hugin project file if it 
 IMGVAR=0                                 # Change the Hugein image variables
 PROJECTION_DEFAULT="full_frame_fisheye"  # projection of the images
 FOV_DEFAULT=10                           # field of view in degrees.  How many degrees does the image span.
-PROJECT_FILE_DEFAULT='project.pto'       # name of the default project file
+PROJECT_FILE_DEFAULT='panorama.pto'      # name of the default project file
 LOG_FILE_DEFAULT='panorama.log'          # name of the log file
-
-# Load support library
-LIBLIST=('stdlib')
-for file in "${LIBLIST[@]}" ; do
-   [ -x "$file" ] && { source $file; }
-done
-
-# Report the script version
-function version {
-    echo "Version: $0 V$VER"
-}
 
 # A general purpose function to check to see if a parameter is valid
 # Parameter: 
@@ -64,7 +70,7 @@ function check_crop {
 }
 
 # Check that command line parameters for controlling the output of the stitched file conflict
-function check_log {
+function check_log_file {
     check_generic "LOG" "$1" "l"
 }
 
@@ -76,6 +82,75 @@ function check_output {
 # Check that command line parameters for controlling the project file conflict or not
 function check_project {
     check_generic "PROJECT" "$1" "r"
+}
+
+function help {
+    echo "USAGE: $0 [-h] [-v] [-o | -O <OUTPUT>] [-c | -C <OUTPUT_CROP>] [-d] [-l | -L <LOG> ] [-r <PROJECT> | [-f <FOV>] [-V] [-p <PROJECTION>] [-R <PROJECT>] IMAGE_LIST] "
+    echo "     c               Suppress the output of the cropped file"
+    echo "     C               Name of the cropped file with no extension.  Default: $CROP_FILE_DEFAULT"
+    echo "     d               clobber the Hugin project, stitched image file(s), or log file if they exists"
+    echo "     f               field of view in degrees. How many degrees does the image span.  Default $FOV_DEFAULT"
+    echo "     h               Prints this help message"
+    echo "     l               Suppress the out of the log file"
+    echo "     L               Name of the log file. Default: $LOG_FILE_DEFAULT"
+    echo "     o               Supress the output of the stitched file"
+    echo "     O               Name of the stitched file with no extension.  Default: $OUTPUT_FILE_DEFAULT"
+    echo "     p               Projection: 0:rectilinear, 1:panoramic, 2:circular_fisheye, 3:full_frame_fisheye"
+    echo "                       4:equirectangular, 8:fisheye_orthographic, 10:fisheye_stereographic, 21:fisheye_equisolid"
+    echo "                       20:fisheye_thoby.  Default: $PROJECTION_DEFAULT"
+    echo "     r               Use the supplied Hugin project file"
+    echo "     R               Create a Hugin project file called <PROJECT>.  Default is $PROJECT_FILE_DEFAULT and if a crop file is"
+    echo "                       going to be created, then $CROP_PROJECT_SUFFIX will be added before the file extension"
+    echo "     v               Prints the version"
+    echo "     V               Change image variables inside Hugin .pto project file"
+    echo "     IMAGE_LIST      A list of images to process. Must be in the last positions.  Wildcard expansion is performed"
+}
+
+# build the output file
+# Parameters
+# $1  base filename without extension
+# $2  file extension (including period)
+function set_crop_file {
+   local filename="$1"
+   local ext="$2"
+
+   AssertNonZeroLen "$filename" "The crop filename must be defined" "2"
+
+   CROP_FILE="$filename"
+   CROP_FILENAME="$filename$ext"
+}
+
+# Set the field of view value
+function set_fov {
+    FOV="$1"
+}
+
+# build the lof file
+# Parameter
+# $1  name of the log file (use '/dev/null' to suppress output)
+function set_log_file {
+    local log="$1"
+
+    AssertNonZeroLen "$log" "The log file must be defined" "2"
+
+    LOG_FILE="$log"
+}
+
+# build the project files
+# Parameter
+# $1  name of the pto file (without the extention)
+# $2  extension to add for the crop pto project
+function set_project_file {
+    local ptoname="$1"
+    local cropext="$2"
+
+    AssertNonZeroLen "$ptoname" "The pto project file must be defined" "2"
+
+    PROJECT_FILE="$ptoname"
+    # add cropext before the last period
+    CROP_PROJECT_FILE="${ptoname//\./$cropext.}"
+    # if there was no period, then just append it to the end
+    [[ "$PROJECT_FILE" == "$CROP_PROJECT_FILE" ]] && { CROP_PROJECT_FILE="$ptoname$cropext"; }
 }
 
 # check the projection parameter and set the parameters
@@ -138,48 +213,6 @@ function set_projection {
         ErrorMsg "Invalid projection $1" "1"
         ;;
     esac
-
-}
-
-# Set the field of view value
-function set_fov {
-    FOV="$1"
-}
-
-function help {
-    echo "USAGE: $0 [-h] [-v] [-o | -O <OUTPUT>] [-c | -C <OUTPUT_CROP>] [-l | -L <LOG> ] [-r <PROJECT> | [-d] [-f <FOV>] [-V] [-p <PROJECTION>] [-R <PROJECT>] IMAGE_LIST] "
-    echo "     c               Suppress the output of the cropped file"
-    echo "     C               Name of the cropped file with no extension.  Default: $CROP_FILE_DEFAULT"
-    echo "     d               clobber the Hugin project, or stitched image file(s) if they exists"
-    echo "     f               field of view in degrees. How many degrees does the image span.  Default $FOV_DEFAULT"
-    echo "     h               Prints this help message"
-    echo "     l               Suppress the out of log files"
-    echo "     L               Name of the log file. Default: $LOG_FILE_DEFAULT"
-    echo "     o               Supress the output of the stitched file"
-    echo "     O               Name of the stitched file with no extension.  Default: $OUTPUT_FILE_DEFAULT"
-    echo "     p               Projection: 0:rectilinear, 1:panoramic, 2:circular_fisheye, 3:full_frame_fisheye"
-    echo "                     4:equirectangular, 8:fisheye_orthographic, 10:fisheye_stereographic, 21:fisheye_equisolid"
-    echo "                     20:fisheye_thoby.  Default: $PROJECTION_DEFAULT"
-    echo "     r               Use the supplied Hugin project file"
-    echo "     R               Create a Hugin project file called <PROJECT>.  Default is $PROJECT_FILE_DEFAULT and if a crop file is"
-    echo "                       going to be created, then $CROP_PROJECT_SUFFIX will be added before the file extension"
-    echo "     v               Prints the version"
-    echo "     V               Change image variables inside Hugin .pto project file"
-    echo "     IMAGE_LIST      A list of images to process. Must be in the last positions.  Wildcard expansion is performed"
-}
-
-# build the project files
-# Parameter
-# $1  name of the pto file (without the extention)
-# $2  extension to add for the crop pto project
-function set_project_file {
-    local ptoname="$1"
-    local cropext="$2"
-
-    AssertNonZeroLen "$ptoname" "The pto project file must be defined" "2"
-
-    PROJECT_FILE="$ptoname"
-    CROP_PROJECT_FILE="$ptoname$cropext"
 }
 
 # build the output file
@@ -194,31 +227,6 @@ function set_output_file {
 
    OUTPUT_FILE="$filename"
    OUTPUT_FILENAME="$filename$ext"
-}
-
-# build the output file
-# Parameters
-# $1  base filename without extension
-# $2  file extension (including period)
-function set_crop_file {
-   local filename="$1"
-   local ext="$2"
-
-   AssertNonZeroLen "$filename" "The crop filename must be defined" "2"
-
-   CROP_FILE="$filename"
-   CROP_FILENAME="$filename$ext"
-}
-
-# build the lof file
-# Parameter
-# $1  name of the log file (use '/dev/null' to suppress output)
-function set_log_file {
-    local log="$1"
-
-    AssertNonZeroLen "$log" "The log file must be defined" "2"
-
-    LOG_FILE="$log"
 }
 
 # create the stitched file
@@ -245,7 +253,9 @@ function stitch_image {
 
       # check to see if the output file is going to be clobbered
       if [[ ! -e "$outfilename" || "$clobber" == "1" ]] ; then
-         nona -v -z LZW -m TIFF -o "$output" "$ptofile"
+         echo "== stitching file $outfilename" >> "$LOG_FILE"
+         nona -v -z LZW -m TIFF -o "$output" "$ptofile" >> "$LOG_FILE" 2>&1
+         [[ "$?" != 0 ]] && { ErrorMsg "nona return with error code $?" "$?"; }
       else
          ErrorMsg "The output file '$outfilename' exists"
       fi
@@ -273,40 +283,58 @@ function make_pto {
     
    IMAGE_STRING=${IMAGE_LIST[@]}
    # http://manpages.ubuntu.com/manpages/trusty/man1/pto_gen.1.html
-   pto_gen --output="$PROJECT_FILE" --projection="$PROJECTION_VALUE" --fov="$FOV" $IMAGE_STRING
+   echo "== Generate pto project file" >> "$LOG_FILE"
+   echo "= PTO File: $PROJECT_FILE" >> "$LOG_FILE"
+   echo "= Projection: $PROJECTION_VALUE" >> "$LOG_FILE"
+   echo "= Field of view: $FOV" >> "$LOG_FILE"
+   echo "= Image list: $IMAGE_STRING" >> "$LOG_FILE"
+   pto_gen --output="$PROJECT_FILE" --projection="$PROJECTION_VALUE" --fov="$FOV" $IMAGE_STRING >> "$LOG_FILE" 2>&1 
+   [[ "$?" != 0 ]] && { ErrorMsg "pto_gen return with error code $?" "$?"; }
    
    # Find the control points
    # http://manpages.ubuntu.com/manpages/oneiric/man1/cpfind.1.html
-   cpfind --multirow --output "$PROJECT_FILE" "$PROJECT_FILE"
+   echo "== Find control points" >> "$LOG_FILE"
+   cpfind --multirow --output "$PROJECT_FILE" "$PROJECT_FILE" >> "$LOG_FILE" 2>&1 
+   [[ "$?" != 0 ]] && { ErrorMsg "cpfind return with error code $?" "$?"; }
 
    # Clean up the control points. Basically, remove ones that are far away
    # http://manpages.ubuntu.com/manpages/natty/man1/cpclean.1.html
-   cpclean -o "$PROJECT_FILE" "$PROJECT_FILE"
+   echo "== Clean up control points" >> "$LOG_FILE"
+   cpclean -o "$PROJECT_FILE" "$PROJECT_FILE" >> "$LOG_FILE" 2>&1  
+   [[ "$?" != 0 ]] && { ErrorMsg "cpclean return with error code $?" "$?"; }
 
    # Find vertical lines and align the image.  Normally, this does nothing.
    # http://manpages.ubuntu.com/manpages/vivid/en/man1/linefind.1.html
-   linefind --output "$PROJECT_FILE" "$PROJECT_FILE"
+   echo "== Detect lines in the images" >> "$LOG_FILE"
+   linefind --output "$PROJECT_FILE" "$PROJECT_FILE" >> "$LOG_FILE" 2>&1
+   [[ "$?" != 0 ]] && { ErrorMsg "linefind return with error code $?" "$?"; }
 
    # optimize the image positions
-## Option 1
-   # TODO: make this an option -- some control position and some control
-   #                              image properties.  Break them up
-   # -a   Auto align mode, includes various optimisation stages, depending on
-   #        the amount and distribution of the control points
-   # -m   Optimise photometric parameters
-   # -s   Automatically select a suitable output projection and size
-   #autooptimiser -a -m -s -o project.pto project.pto
-## Option 2
-   # Or we could run the optimizer
-   # http://manpages.ubuntu.com/manpages/vivid/en/man1/pto_var.1.html
-   # http://manpages.ubuntu.com/manpages/vivid/en/man1/autooptimiser.1.html
+   if [[ "$IMGVAR" == "1" ]] ; then
+       ## Option 1
+       # -a   Auto align mode, includes various optimisation stages, depending on
+       #        the amount and distribution of the control points
+       # -m   Optimise photometric parameters
+       # -s   Automatically select a suitable output projection and size
+       echo "== Optimise the pto parameters by aligning, setting photometric parameters and projection and size" >> "$LOG_FILE"
+       autooptimiser -a -m -s -o "$PROJECT_FILE" "$PROJECT_FILE" 2>&1 >> "$LOG_FILE"
+       [[ "$?" != 0 ]] && { ErrorMsg "autooptimiser return with error code $?" "$?"; }
+   else
+       ## Option 2
+       # Or we could run the optimizer
+       # http://manpages.ubuntu.com/manpages/vivid/en/man1/pto_var.1.html
+       # http://manpages.ubuntu.com/manpages/vivid/en/man1/autooptimiser.1.html
 
-   #  --opt y,p,r Optimize yaw, pitch and roll of all images
-   pto_var --opt y,p,r --output "$PROJECT_FILE" "$PROJECT_FILE"
+       #  --opt y,p,r Optimize yaw, pitch and roll of all images
+       echo "== Optimise the roll, pitch and yaw of the image" >> "$LOG_FILE"
+       pto_var --opt y,p,r --output "$PROJECT_FILE" "$PROJECT_FILE" >> "$LOG_FILE" 2>&1
+       [[ "$?" != 0 ]] && { ErrorMsg "pto_var return with error code $?" "$?"; }
 
-   # Optimize parameters specified in script file (like PToptimizer).
-   autooptimiser -n -o "$PROJECT_FILE" "$PROJECT_FILE"
-## End Option 2
+       # Optimize parameters specified in script file (like PToptimizer).
+       echo "== Optimise pto parameters" >> "$LOG_FILE"
+       autooptimiser -n -o "$PROJECT_FILE" "$PROJECT_FILE" >> "$LOG_FILE" 2>&1
+       [[ "$?" != 0 ]] && { ErrorMsg "autooptimiser return with error code $?" "$?"; }
+   fi
 
    # Create the pto file for the cropped image.  The default behaviour is to
    # create this file, so always do it unless it has been suppressed
@@ -314,13 +342,35 @@ function make_pto {
    #       on a file that is already had pano_modify called on it.
    if [[ "$CROP" != "SUPPRESS" ]] ; then
       # crop the image
-      pano_modify --crop=AUTO --straighten --center --canvas=AUTO --output="$CROP_PROJECT_FILE" "$PROJECT_FILE"
+      echo "== Create the pto project file for the cropped image" >> "$LOG_FILE"
+      echo "= PTO File: $CROP_PROJECT_FILE" >> "$LOG_FILE"
+      echo "= parameters: straigthen, center, adjust canvas" >> "$LOG_FILE"
+      pano_modify --crop=AUTO --straighten --center --canvas=AUTO --output="$CROP_PROJECT_FILE" "$PROJECT_FILE" >> "$LOG_FILE" 2>&1
+      [[ "$?" != 0 ]] && { ErrorMsg "pano_modify return with error code $?" "$?"; }
       MAKE_CROP=1
    fi
 
-   # Clean up the orintation and output image
-   pano_modify --straighten --center --canvas=AUTO --output="$PROJECT_FILE" "$PROJECT_FILE"
+   # Clean up the orientation and centre the output image
+   echo "== Clean up the orientation and centre the output image" >> "$LOG_FILE"
+   echo "= parameters: straigthen, center, adjust canvas" >> "$LOG_FILE"
+   pano_modify --straighten --center --canvas=AUTO --output="$PROJECT_FILE" "$PROJECT_FILE" >> "$LOG_FILE" 2>&1
+   [[ "$?" != 0 ]] && { ErrorMsg "pano_modify return with error code $?" "$?"; }
 }
+
+# Report the script version
+function version {
+    echo "Version: $0 V$VER"
+}
+
+#############################################################
+# Main Section                                              #
+#############################################################
+
+# Load support library
+LIBLIST=('stdlib')
+for file in "${LIBLIST[@]}" ; do
+   [ -x "$file" ] && { source $file; }
+done
 
 # Setup defaults
 set_projection "$PROJECTION_DEFAULT"
@@ -330,9 +380,12 @@ set_crop_file "$CROP_FILE_DEFAULT" "$CROP_FILE_EXT"
 set_output_file "$OUTPUT_FILE_DEFAULT" "$OUTPUT_FILE_EXT"
 set_log_file "$LOG_FILE_DEFAULT"
 
+# get the command line
+CMD_LINE="$0 $@"
+
 # Process the command line options
 OPTIND=1
-while getopts "hvoO:cC:f:p:r:dVR:" opt; do
+while getopts "hvdlL:oO:cC:f:p:r:VR:" opt; do
     case "$opt" in
     c)  check_crop "SUPPRESS" 
         ;;
@@ -340,7 +393,6 @@ while getopts "hvoO:cC:f:p:r:dVR:" opt; do
         set_crop_file "$OPTARG" "$CROP_FILE_EXT"
         ;;
     d)  CLOBBER=1
-        check_project "CREATE"
         ;;
     f)  set_fov "$OPTARG"
         check_project "CREATE"
@@ -358,6 +410,7 @@ while getopts "hvoO:cC:f:p:r:dVR:" opt; do
         ;;
     O)  check_output "PROCESS"
         set_output_file "$OPTARG" "$OUTPUT_FILE_EXT"
+        [[ "$CROP" != "PROCESS" ]] && { set_crop_file "$OPTARG$CROP_PROJECT_SUFFIX" "$CROP_FILE_EXT"; }
         ;;
     p)  set_projection "$OPTARG"
         check_project "CREATE"
@@ -401,6 +454,13 @@ if [[ "$CLOBBER" != "1" ]] ; then
    [[ -e "$CROP_FILENAME" && "$OUTPUT" != "SUPPRESS" && "$CROP" != "SUPPRESS" ]] && { ErrorMsg "Output file ($CROP_FILE) exists.  Overwrite with -d option" "1"; }
    [[ -e "$LOG_FILE" && "$LOG" != "SUPPRESS" ]] && { ErrorMsg "Log file ($LOG_FILE) exists). Overwrite with -d option" "1"; }
 fi
+
+# Check to make sure that the output and crop files are not the same
+[[ "$OUTPUT_FILE" == "$CROP_FILE" && "$CROP" != "SUPRESS" ]] && { ErrorMsg "output and crop image files are the same ($OUTPUT_FILE) and will overwrite each other"; }
+
+# Log basic information
+echo "Command: $CMD_LINE" > "$LOG_FILE"
+version >> "$LOG_FILE"
 
 # We need to create the Hugin pto file
 [[ "$PROJECT" != "PTOGIVEN" ]] && { make_pto; }

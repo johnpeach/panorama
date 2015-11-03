@@ -18,13 +18,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Maintainer john@jppeach.com <John Peach> 
+# Maintainer: John Peach <john@jppeach.com>
 #
 
 VER='1.1.0'
-# CHANGELOG
-# 1.0.0 Initial release
-# 1.1.0 Added options h,v,o,O,c,C,d,l,L,r,f,V,p,R
 
 # Bugs
 # Error messages sent to ErrorMsg and AssertNonZeroLen are not logged

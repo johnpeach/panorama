@@ -13,6 +13,12 @@ to maintain the same spacial alignment.
 To get assistance, run the command:
 ./panorama -h
 
+# Requirement
+
+This script requires the use of the Hugin tools for processing the images.  On Ubuntu, they can be installed with
+
+sudo apt-get install hugin-tools
+
 # Known Bugs
 * Error messages sent to ErrorMsg and AssertNonZeroLen are not logged
 * Does not check to make sure Hugin scripts are installed
